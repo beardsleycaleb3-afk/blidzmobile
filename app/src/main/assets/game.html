@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mascot Runner 3D</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b0f19;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      touch-action: none;
+    }
+    #renderCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+    /* 2D HUD OVERLAY */
+    #hudContainer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 12px;
+      z-index: 10;
+    }
+    .hud-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .hud-card {
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 6px 12px;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .hud-val {
+      font-size: 18px;
+      font-weight: 900;
+      color: #fbbf24;
+      line-height: 1.1;
+    }
+    .hud-label {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #94a3b8;
+    }
+    .score-badge {
+      background: linear-gradient(135deg, #0284c7, #0f172a);
+      border: 2px solid #38bdf8;
+    }
+    .score-val {
+      font-size: 22px;
+      color: #38bdf8;
+      text-shadow: 0 0 8px rgba(56,189,248,0.5);
+    }
+
+    /* CLOCKS & DIFFICULTY BAR */
+    .clock-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+      justify-content: center;
+    }
+    .clock-chip {
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(250, 204, 21, 0.3);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 800;
+      color: #facc15;
+    }
+
+    .difficulty-selector {
+      display: flex;
+      gap: 4px;
+      pointer-events: auto;
+      margin-top: 4px;
+    }
+    .diff-btn {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #cbd5e1;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 3px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .diff-btn.active {
+      background: #f59e0b;
+      color: #0f172a;
+      border-color: #facc15;
+    }
+
+    .hof-meter-container {
+      width: 100%;
+      max-width: 200px;
+      text-align: center;
+    }
+    .hof-meter-bg {
+      width: 100%;
+      height: 12px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(250, 204, 21, 0.4);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    .hof-meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #f59e0b, #facc15, #38bdf8);
+      box-shadow: 0 0 8px #facc15;
+      transition: width 0.2s ease-out;
+    }
+
+    /* FLOATING FEEDBACK TEXT */
+    #floatingTextContainer {
+      position: absolute;
+      top: 32%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      text-align: center;
+      z-index: 20;
+    }
+    .float-msg {
+      font-size: 22px;
+      font-weight: 900;
+      color: #facc15;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9), 0 0 10px #f59e0b;
+      opacity: 1;
+      transform: scale(1.1);
+      transition: all 0.5s ease-out;
+    }
+
+    /* TOUCH GUIDE OVERLAY */
+    .touch-guide-bar {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.85);
+      border-radius: 12px;
+      padding: 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .touch-pill {
+      font-size: 9px;
+      color: #cbd5e1;
+      font-weight: 700;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .touch-icon {
+      font-size: 13px;
+      color: #38bdf8;
+    }
+
+    /* GAME OVER MODAL & STAR RATING */
+    #modalOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(11, 15, 25, 0.94);
+      backdrop-filter: blur(12px);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      z-index: 100;
+      pointer-events: auto;
+    }
+    .modal-card {
+      background: #1e293b;
+      border: 2px solid #facc15;
+      border-radius: 20px;
+      padding: 20px;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+      color: white;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    }
+    .modal-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: #ef4444;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* 10-STAR RATING COMPONENT */
+    .star-rating-container {
+      margin: 12px 0 6px 0;
+      padding: 8px;
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 12px;
+      border: 1px solid rgba(250, 204, 21, 0.3);
+    }
+    .star-row {
+      display: flex;
+      justify-content: center;
+      gap: 2px;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    .star-icon {
+      color: #475569;
+    }
+    .star-icon.active {
+      color: #facc15;
+      text-shadow: 0 0 6px #f59e0b;
+    }
+    .star-feedback-msg {
+      font-size: 12px;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+
+    .modal-stat {
+      display: flex;
+      justify-content: space-between;
+      margin: 6px 0;
+      font-size: 13px;
+      color: #cbd5e1;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 4px;
+    }
+    .modal-stat-val {
+      font-weight: 800;
+      color: #facc15;
+    }
+    .btn-restart {
+      margin-top: 14px;
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #0f172a;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+  </style>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+
+  <!-- HUD OVERLAY -->
+  <div id="hudContainer">
+    <div class="hud-top-bar">
+      <!-- TOP LEFT: YARDS & DODGES -->
+      <div class="hud-card">
+        <div class="hud-label">DISTANCE & DODGES</div>
+        <div class="hud-val" id="hudYards">0 YD</div>
+        <div style="font-size: 11px; font-weight: 800; color: #10b981;" id="hudDodges">0 DODGED</div>
+      </div>
+
+      <!-- CENTER: HOF METER & CHRONOMETER CLOCKS -->
+      <div class="hof-meter-container">
+        <div class="hud-label" id="planeLabel" style="color:#facc15;">GROUND TURF (PLANE 1)</div>
+        <div class="hof-meter-bg">
+          <div class="hof-meter-fill" id="hofFill"></div>
+        </div>
+
+        <!-- Clocks -->
+        <div class="clock-bar">
+          <span class="clock-chip" id="clockPlay">PLAY 40s</span>
+          <span class="clock-chip" id="clockGame">GAME 15:00</span>
+        </div>
+
+        <!-- Difficulty Level Selector -->
+        <div class="difficulty-selector">
+          <button class="diff-btn active" onclick="setDifficulty('ROOKIE')">ROOKIE</button>
+          <button class="diff-btn" onclick="setDifficulty('PRO')">PRO</button>
+          <button class="diff-btn" onclick="setDifficulty('ALL_STAR')">ALL-STAR</button>
+          <button class="diff-btn" onclick="setDifficulty('HOF')">HOF</button>
+        </div>
+      </div>
+
+      <!-- TOP RIGHT: LIVE TOTAL SCORE BADGE -->
+      <div class="hud-card score-badge" style="text-align: right;">
+        <div class="hud-label" style="color:#38bdf8;">TOTAL SCORE</div>
+        <div class="hud-val score-val" id="hudScore">0</div>
+        <div id="hudMultiplier" style="font-size: 10px; font-weight: 800; color: #facc15;">1.0x MULTI</div>
+      </div>
+    </div>
+
+    <!-- Floating text feedback -->
+    <div id="floatingTextContainer"></div>
+
+    <!-- TOUCH CONTROLS GUIDE BAR -->
+    <div class="touch-guide-bar">
+      <div class="touch-pill"><span class="touch-icon">↔</span>Shift 1</div>
+      <div class="touch-pill"><span class="touch-icon">⇇ ⇉</span>Ext. 2</div>
+      <div class="touch-pill"><span class="touch-icon">↓</span>Spin (+100)</div>
+      <div class="touch-pill"><span class="touch-icon">↑</span>Vault Jump</div>
+      <div class="touch-pill"><span class="touch-icon">••</span>Double-Tap Truck</div>
+    </div>
+  </div>
+
+  <!-- GAME OVER / RUN SUMMARY MODAL WITH 10-STAR RATING -->
+  <div id="modalOverlay">
+    <div class="modal-card">
+      <div class="modal-title" id="modalTitle">TACKLED!</div>
+      
+      <!-- 10 STAR RATING COMPONENT -->
+      <div class="star-rating-container">
+        <div class="star-row" id="starRow">
+          <!-- 10 Stars dynamically filled -->
+        </div>
+        <div class="star-feedback-msg" id="starFeedbackMsg">Got 2 out of 10 stars for that run?? Try again !!</div>
+      </div>
+
+      <div class="modal-stat"><span>Distance Traveled</span><span class="modal-stat-val" id="resYards">0 yds</span></div>
+      <div class="modal-stat"><span>Blitzers Dodged</span><span class="modal-stat-val" id="resDodges">0</span></div>
+      <div class="modal-stat"><span>Final XP Score</span><span class="modal-stat-val" id="resXP">0 XP</span></div>
+      <div class="modal-stat"><span>Gold Footballs</span><span class="modal-stat-val" id="resCoins">0</span></div>
+      <div class="modal-stat"><span>Difficulty Mode</span><span class="modal-stat-val" id="resDiff">ROOKIE</span></div>
+      
+      <button class="btn-restart" id="btnRestart">TRY AGAIN !!</button>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // CHRONOMETERS & CLOCK TIMING ARCHITECTURE
+    // ==========================================
+    // Lets & Consts for Timing Clocks
+    const PLAY_CLOCK_DEFAULT = 40.0;
+    const GAME_CLOCK_DEFAULT = 900.0; // 15:00 game clock
+
+    let playClock = PLAY_CLOCK_DEFAULT;
+    let gameClock = GAME_CLOCK_DEFAULT;
+    let statesClock = 0.0; // Time spent in active power states
+    let menuClock = 0.0;
+    let renderClock = 0.0; // High precision delta render clock
+
+    // ==========================================
+    // DIFFICULTY LEVELS & SCORING SYSTEM
+    // ==========================================
+    const DIFFICULTY_SETTINGS = {
+      ROOKIE: { speedBase: 14.0, spawnFreq: 1.3, multi: 1.0, name: "ROOKIE" },
+      PRO: { speedBase: 17.0, spawnFreq: 1.0, multi: 1.4, name: "PRO" },
+      ALL_STAR: { speedBase: 20.0, spawnFreq: 0.8, multi: 1.8, name: "ALL-STAR" },
+      HOF: { speedBase: 24.0, spawnFreq: 0.6, multi: 2.5, name: "HALL OF FAME" }
+    };
+    let currentDifficulty = DIFFICULTY_SETTINGS.ROOKIE;
+
+    function setDifficulty(levelKey) {
+      if (DIFFICULTY_SETTINGS[levelKey]) {
+        currentDifficulty = DIFFICULTY_SETTINGS[levelKey];
+        document.querySelectorAll('.diff-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        showFloatingText("DIFFICULTY: " + currentDifficulty.name);
+      }
+    }
+
+    // Grid Mapping: [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+    const GRID_SLOTS = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+    const LANE_WIDTH = 1.8;
+
+    let activeLaneIndex = 4; // Center lane
+    let currentYards = 0;
+    let blitzersDodged = 0;
+    let totalScore = 0;
+    let currentXP = 0;
+    let goldFootballs = 0;
+    let currentMultiplier = 1.0;
+    let isFlawless = true;
+
+    // Loadout Equipment
+    let gearLoadout = { helmetLevel: 1, padsLevel: 1, cleatsLevel: 1, glovesLevel: 1, ballLevel: 1 };
+
+    // State Variables
+    let isGameOver = false;
+    let isPlaying = true;
+    let currentPlane = 1; // 1 = Base Turf, 2 = Skyway HOF
+    let skywayTimer = 0;
+    let hofMeter = 0;
+    let isSpinning = false;
+    let isJumping = false;
+    let isTrucking = false;
+    let truckingTimer = 0;
+    let bulletTimeTimer = 0;
+    let playerY = 0.8;
+    let targetX = 0;
+    let currentX = 0;
+
+    // WEBVIEW BRIDGE COMMUNICATION
+    function notifyAndroidGameEnded(yards, xp, coins) {
+      if (window.AndroidBridge && window.AndroidBridge.onGameOver) {
+        window.AndroidBridge.onGameOver(yards, xp, coins, currentMultiplier, isFlawless);
+      }
+    }
+
+    window.setEquipmentLoadout = function(helmet, pads, cleats, gloves, ball) {
+      gearLoadout.helmetLevel = helmet || 1;
+      gearLoadout.padsLevel = pads || 1;
+      gearLoadout.cleatsLevel = cleats || 1;
+      gearLoadout.glovesLevel = gloves || 1;
+      gearLoadout.ballLevel = ball || 1;
+    };
+
+    // ==========================================
+    // BABYLON 3D STADIUM & SCENE SETUP
+    // ==========================================
+    const canvas = document.getElementById('renderCanvas');
+    let engine, scene, camera, mascotMesh, turfPlane, skywayPlane;
+    let obstacleMeshes = [];
+    let pickupMeshes = [];
+
+    function init3DGameEngine() {
+      if (typeof BABYLON === 'undefined') {
+        setupCanvasFallback();
+        return;
+      }
+
+      engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+      scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color4(0.05, 0.08, 0.15, 1.0);
+
+      // Camera
+      camera = new BABYLON.TargetCamera("Camera", new BABYLON.Vector3(0, 5, -8), scene);
+      camera.setTarget(new BABYLON.Vector3(0, 1.5, 3));
+
+      // Lights
+      const light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+      light.intensity = 0.9;
+
+      // STADIUM BACKGROUND: HORIZON BLEACHERS & STANDS
+      const bleacherMat = new BABYLON.StandardMaterial("bleacherMat", scene);
+      bleacherMat.diffuseColor = new BABYLON.Color3(0.15, 0.2, 0.3);
+      const bleacherMesh = BABYLON.MeshBuilder.CreateBox("bleachers", { width: 120, height: 25, depth: 4 }, scene);
+      bleacherMesh.position.set(0, 12, 180);
+      bleacherMesh.material = bleacherMat;
+
+      // GOAL POSTS AT ENDZONE / HORIZON
+      const goalMat = new BABYLON.StandardMaterial("goalMat", scene);
+      goalMat.diffuseColor = new BABYLON.Color3(0.95, 0.8, 0.1);
+      const postVert = BABYLON.MeshBuilder.CreateCylinder("postV", { diameter: 0.4, height: 10 }, scene);
+      postVert.position.set(0, 5, 170);
+      postVert.material = goalMat;
+
+      const postCross = BABYLON.MeshBuilder.CreateCylinder("postC", { diameter: 0.3, height: 8 }, scene);
+      postCross.rotation.z = Math.PI / 2;
+      postCross.position.set(0, 8, 170);
+      postCross.material = goalMat;
+
+      // PLANE 1: GROUND TURF & PADDED KNEE WALLS
+      const turfMat = new BABYLON.StandardMaterial("turfMat", scene);
+      turfMat.diffuseColor = new BABYLON.Color3(0.08, 0.52, 0.18);
+
+      turfPlane = BABYLON.MeshBuilder.CreateGround("turfPlane", { width: 18, height: 200 }, scene);
+      turfPlane.material = turfMat;
+      turfPlane.position.z = 80;
+
+      // Padded Sideline Knee Walls along -4 and +4 boundary lanes
+      const wallMat = new BABYLON.StandardMaterial("wallMat", scene);
+      wallMat.diffuseColor = new BABYLON.Color3(0.8, 0.15, 0.15);
+      [-8.5, 8.5].forEach(xPos => {
+        const kneeWall = BABYLON.MeshBuilder.CreateBox("kneeWall", { width: 0.8, height: 1.2, depth: 200 }, scene);
+        kneeWall.position.set(xPos, 0.6, 80);
+        kneeWall.material = wallMat;
+      });
+
+      // Yard Line Stripe Markings
+      for (let i = 0; i < 20; i++) {
+        const stripe = BABYLON.MeshBuilder.CreatePlane("stripe" + i, { width: 16, height: 0.4 }, scene);
+        stripe.rotation.x = Math.PI / 2;
+        stripe.position.z = i * 10;
+        stripe.position.y = 0.01;
+        const stripeMat = new BABYLON.StandardMaterial("stripeMat", scene);
+        stripeMat.diffuseColor = new BABYLON.Color3(0.95, 0.95, 0.95);
+        stripe.material = stripeMat;
+      }
+
+      // PLANE 2: SKYWAY HOF
+      const skyMat = new BABYLON.StandardMaterial("skyMat", scene);
+      skyMat.diffuseColor = new BABYLON.Color3(0.95, 0.75, 0.1);
+      skywayPlane = BABYLON.MeshBuilder.CreateGround("skywayPlane", { width: 18, height: 200 }, scene);
+      skywayPlane.material = skyMat;
+      skywayPlane.position.set(0, 30, 80);
+
+      // PLAYER MASCOT MESH
+      mascotMesh = BABYLON.MeshBuilder.CreateBox("mascot", { width: 0.8, height: 1.4, depth: 0.8 }, scene);
+      mascotMesh.position.set(0, playerY, 0);
+      const mascotMat = new BABYLON.StandardMaterial("mascotMat", scene);
+      mascotMat.diffuseColor = new BABYLON.Color3(0.15, 0.35, 0.9);
+      mascotMesh.material = mascotMat;
+
+      // Helmet & Ball
+      const helmet = BABYLON.MeshBuilder.CreateSphere("helmet", { diameter: 0.7 }, scene);
+      helmet.position.y = 0.8;
+      helmet.parent = mascotMesh;
+
+      // HIGH EFFICIENCY LOOP: INPUT -> ADJUST -> RENDER
+      engine.runRenderLoop(() => {
+        const dt = engine.getDeltaTime() / 1000;
+        renderClock += dt;
+
+        if (isPlaying && !isGameOver) {
+          // 1. INPUT ADJUST STEP
+          processTimingClocks(dt);
+          // 2. ADJUST STEP
+          updateGameLogic(dt);
+          // 3. RENDER STEP
+          scene.render();
+        }
+      });
+
+      window.addEventListener("resize", () => engine.resize());
+    }
+
+    // ==========================================
+    // CLOCK TIMING & GAME LOGIC ENGINE
+    // ==========================================
+    function processTimingClocks(dt) {
+      // Play Clock countdown (40 seconds per drive cycle)
+      playClock -= dt;
+      if (playClock <= 0) {
+        playClock = PLAY_CLOCK_DEFAULT;
+        showFloatingText("PLAY CLOCK RESET!");
+      }
+
+      // Game Clock countdown (15:00)
+      gameClock = Math.max(0, gameClock - dt);
+
+      // Update HUD Clocks
+      const playSecs = Math.ceil(playClock);
+      document.getElementById('clockPlay').innerText = `PLAY ${playSecs}s`;
+
+      const gMins = Math.floor(gameClock / 60);
+      const gSecs = Math.floor(gameClock % 60).toString().padStart(2, '0');
+      document.getElementById('clockGame').innerText = `GAME ${gMins}:${gSecs}`;
+    }
+
+    let spawnTimer = 0;
+
+    function updateGameLogic(dt) {
+      // Speed calculation based on difficulty and cleats
+      let effSpeed = (currentDifficulty.speedBase + (gearLoadout.cleatsLevel * 1.5));
+      if (bulletTimeTimer > 0) {
+        effSpeed *= 0.5;
+        bulletTimeTimer -= dt;
+      }
+
+      // Distance Yards Traversed
+      const yardsTraversed = (effSpeed * dt) / 2.5;
+      currentYards += yardsTraversed;
+
+      // Score Engine: Distance + Blitzers Dodged + XP
+      let yardScore = Math.floor(currentYards) * 10;
+      let dodgeScore = blitzersDodged * 100;
+      totalScore = Math.round((yardScore + dodgeScore + currentXP) * currentDifficulty.multi);
+
+      // Check First Down 10-Yard Milestones
+      let prev10 = Math.floor((currentYards - yardsTraversed) / 10);
+      let new10 = Math.floor(currentYards / 10);
+      if (new10 > prev10 && new10 > 0) {
+        currentXP += 200 + (new10 * 50);
+        showFloatingText("FIRST DOWN! +" + (200 + new10 * 50) + " XP");
+        hofMeter = Math.min(100, hofMeter + 15);
+      }
+
+      // Skyway Timer Update
+      if (currentPlane === 2) {
+        skywayTimer -= dt;
+        if (skywayTimer <= 0) returnToBaseTurf();
+      }
+
+      // Lane Shift Interpolation
+      const targetSlot = GRID_SLOTS[activeLaneIndex];
+      targetX = targetSlot * LANE_WIDTH;
+      let shiftSpeed = 12.0 + (gearLoadout.cleatsLevel * 2.0);
+      currentX += (targetX - currentX) * Math.min(1.0, dt * shiftSpeed);
+
+      // Out-of-Bounds Hazard Rebound Check
+      if (Math.abs(activeLaneIndex - 4) === 4) {
+        isFlawless = false;
+        showFloatingText("BOUNDARY BUMP!");
+        if (activeLaneIndex === 0) activeLaneIndex = 1;
+        if (activeLaneIndex === 8) activeLaneIndex = 7;
+      }
+
+      // Jump & Spin Mechanics
+      if (isJumping) {
+        playerY += dt * 4;
+        if (playerY >= 2.5) isJumping = false;
+      } else {
+        let baseH = (currentPlane === 2) ? 30.8 : 0.8;
+        playerY += (baseH - playerY) * Math.min(1.0, dt * 10);
+      }
+
+      if (mascotMesh) {
+        mascotMesh.position.x = currentX;
+        mascotMesh.position.y = playerY;
+        if (isSpinning) {
+          mascotMesh.rotation.y += dt * 18;
+          if (mascotMesh.rotation.y >= Math.PI * 2) {
+            mascotMesh.rotation.y = 0;
+            isSpinning = false;
+          }
+        }
+      }
+
+      // Object Spawner & Collision Updates
+      spawnTimer += dt;
+      if (spawnTimer >= currentDifficulty.spawnFreq) {
+        spawnTimer = 0;
+        spawnFieldObjects();
+      }
+      updateFieldObjects(dt, effSpeed);
+
+      // HUD Update
+      updateHudDisplay();
+    }
+
+    function returnToBaseTurf() {
+      currentPlane = 1;
+      showFloatingText("RETURN TO STADIUM!");
+      if (mascotMesh) mascotMesh.position.y = 0.8;
+      if (camera) camera.position.set(0, 5, -8);
+    }
+
+    function spawnFieldObjects() {
+      if (!scene) return;
+      let slotIdx = Math.floor(Math.random() * 7) + 1;
+      let slotVal = GRID_SLOTS[slotIdx];
+      let spawnZ = 80;
+      let planeY = (currentPlane === 2) ? 30.8 : 0.8;
+
+      if (currentPlane === 1) {
+        if (Math.random() < 0.6) {
+          // Blitzer / Obstacle
+          const obs = BABYLON.MeshBuilder.CreateBox("obs", { width: 1.2, height: 1.2, depth: 1.2 }, scene);
+          obs.position.set(slotVal * LANE_WIDTH, planeY, spawnZ);
+          const mat = new BABYLON.StandardMaterial("obsMat", scene);
+          mat.diffuseColor = new BABYLON.Color3(0.9, 0.2, 0.2);
+          obs.material = mat;
+          obs.isObstacle = true;
+          obstacleMeshes.push(obs);
+        } else {
+          // Gold Football
+          const coin = BABYLON.MeshBuilder.CreateSphere("coin", { diameter: 0.6 }, scene);
+          coin.position.set(slotVal * LANE_WIDTH, planeY + 0.2, spawnZ);
+          const mat = new BABYLON.StandardMaterial("coinMat", scene);
+          mat.diffuseColor = new BABYLON.Color3(0.98, 0.8, 0.1);
+          coin.material = mat;
+          coin.isCoin = true;
+          pickupMeshes.push(coin);
+        }
+      }
+    }
+
+    function updateFieldObjects(dt, speed) {
+      for (let i = obstacleMeshes.length - 1; i >= 0; i--) {
+        let obs = obstacleMeshes[i];
+        obs.position.z -= speed * dt;
+
+        if (Math.abs(obs.position.z - 0) < 1.0 && Math.abs(obs.position.x - currentX) < 1.1) {
+          if (isTrucking || isSpinning || isJumping) {
+            blitzersDodged++;
+            currentXP += 100;
+            showFloatingText("BLITZER DODGED! +100 XP");
+            obs.dispose();
+            obstacleMeshes.splice(i, 1);
+            continue;
+          } else {
+            handlePlayerTackled();
+            return;
+          }
+        }
+        if (obs.position.z < -10) {
+          blitzersDodged++; // Dodged by lane shift!
+          obs.dispose();
+          obstacleMeshes.splice(i, 1);
+        }
+      }
+
+      for (let i = pickupMeshes.length - 1; i >= 0; i--) {
+        let p = pickupMeshes[i];
+        p.position.z -= speed * dt;
+        if (Math.abs(p.position.z - 0) < 1.0 && Math.abs(p.position.x - currentX) < 1.0) {
+          goldFootballs += 1;
+          currentXP += 25;
+          p.dispose();
+          pickupMeshes.splice(i, 1);
+        } else if (p.position.z < -10) {
+          p.dispose();
+          pickupMeshes.splice(i, 1);
+        }
+      }
+    }
+
+    // ==========================================
+    // 10-STAR RATING SYSTEM & GAME OVER
+    // ==========================================
+    function calculateStarRating() {
+      // Calculate 1 to 10 Stars based on yards, dodges, and score
+      let rating = 1;
+      if (currentYards > 15) rating = 2;
+      if (currentYards > 30 || blitzersDodged >= 2) rating = 3;
+      if (currentYards > 50 || blitzersDodged >= 4) rating = 4;
+      if (currentYards > 75 && blitzersDodged >= 5) rating = 5;
+      if (currentYards > 100) rating = 6;
+      if (currentYards > 130 && blitzersDodged >= 8) rating = 7;
+      if (currentYards > 160) rating = 8;
+      if (currentYards > 200 && isFlawless) rating = 9;
+      if (currentYards > 250 && isFlawless) rating = 10;
+      return rating;
+    }
+
+    function handlePlayerTackled() {
+      isGameOver = true;
+      isPlaying = false;
+
+      const stars = calculateStarRating();
+
+      // Render 10 Star Icons
+      const starRow = document.getElementById('starRow');
+      starRow.innerHTML = '';
+      for (let s = 1; s <= 10; s++) {
+        const span = document.createElement('span');
+        span.className = 'star-icon' + (s <= stars ? ' active' : '');
+        span.innerText = '★';
+        starRow.appendChild(span);
+      }
+
+      // Dynamic Feedback Message
+      const msgElem = document.getElementById('starFeedbackMsg');
+      if (stars <= 3) {
+        msgElem.innerText = `Got ${stars} out of 10 stars for that run?? Try again !!`;
+      } else if (stars <= 6) {
+        msgElem.innerText = `Solid ${stars}/10 Star Run! Push for the Hall of Fame !!`;
+      } else if (stars <= 9) {
+        msgElem.innerText = `Outstanding ${stars}/10 Star All-Pro Drive !!`;
+      } else {
+        msgElem.innerText = `PERFECT 10/10 STAR FLAWLESS RUN !!`;
+      }
+
+      // Populate Results Modal
+      document.getElementById('resYards').innerText = Math.floor(currentYards) + " yds";
+      document.getElementById('resDodges').innerText = blitzersDodged;
+      document.getElementById('resXP').innerText = totalScore + " PTS";
+      document.getElementById('resCoins').innerText = goldFootballs;
+      document.getElementById('resDiff').innerText = currentDifficulty.name;
+      document.getElementById('modalTitle').innerText = "TACKLED AT " + Math.floor(currentYards) + " YDS";
+      document.getElementById('modalOverlay').style.display = 'flex';
+
+      notifyAndroidGameEnded(Math.floor(currentYards), totalScore, goldFootballs);
+    }
+
+    // ==========================================
+    // TOUCH GESTURE ENGINE
+    // ==========================================
+    let touchStartX = 0, touchStartY = 0, touchStartTime = 0, lastTapTime = 0;
+
+    window.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 0) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchStartTime = Date.now();
+        let now = Date.now();
+        if (now - lastTapTime < 280) executeDoubleTapTruck();
+        lastTapTime = now;
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+      if (!isPlaying || isGameOver) return;
+      if (e.changedTouches.length > 0) {
+        let deltaX = e.changedTouches[0].clientX - touchStartX;
+        let deltaY = e.changedTouches[0].clientY - touchStartY;
+        let absX = Math.abs(deltaX), absY = Math.abs(deltaY);
+
+        if (absX > 120) {
+          shiftLane(deltaX < 0 ? -2 : 2);
+        } else if (absX > 35 && absX > absY) {
+          shiftLane(deltaX < 0 ? -1 : 1);
+        } else if (deltaY > 45 && absY > absX) {
+          executeSpinMove();
+        } else if (deltaY < -45 && absY > absX) {
+          executeJumpVault();
+        }
+      }
+    }, { passive: false });
+
+    function shiftLane(delta) {
+      activeLaneIndex = Math.max(0, Math.min(GRID_SLOTS.length - 1, activeLaneIndex + delta));
+    }
+    function executeSpinMove() { if (!isSpinning) { isSpinning = true; showFloatingText("SPIN MOVE!"); } }
+    function executeJumpVault() { if (!isJumping) { isJumping = true; showFloatingText("VAULT JUMP!"); } }
+    function executeDoubleTapTruck() { if (gearLoadout.padsLevel >= 1) { isTrucking = true; showFloatingText("TRUCK CHARGE!"); } }
+
+    function updateHudDisplay() {
+      document.getElementById('hudYards').innerText = Math.floor(currentYards) + " YD";
+      document.getElementById('hudDodges').innerText = blitzersDodged + " DODGED";
+      document.getElementById('hudScore').innerText = totalScore;
+      document.getElementById('hudMultiplier').innerText = currentDifficulty.multi + "x " + currentDifficulty.name;
+      document.getElementById('hofFill').style.width = hofMeter + "%";
+    }
+
+    function showFloatingText(msg) {
+      const container = document.getElementById('floatingTextContainer');
+      const div = document.createElement('div');
+      div.className = 'float-msg';
+      div.innerText = msg;
+      container.appendChild(div);
+      setTimeout(() => { div.style.opacity = '0'; div.style.transform = 'translateY(-25px) scale(1.3)'; }, 50);
+      setTimeout(() => { if (div.parentNode) div.parentNode.removeChild(div); }, 600);
+    }
+
+    function setupCanvasFallback() {
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      function render() {
+        if (!isPlaying) return;
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(render);
+      }
+      render();
+    }
+
+    document.getElementById('btnRestart').addEventListener('click', () => {
+      document.getElementById('modalOverlay').style.display = 'none';
+      resetGameState();
+    });
+
+    function resetGameState() {
+      activeLaneIndex = 4;
+      currentYards = 0;
+      blitzersDodged = 0;
+      totalScore = 0;
+      currentXP = 0;
+      goldFootballs = 0;
+      isFlawless = true;
+      isGameOver = false;
+      isPlaying = true;
+      currentPlane = 1;
+      hofMeter = 0;
+      playClock = PLAY_CLOCK_DEFAULT;
+
+      obstacleMeshes.forEach(m => m.dispose());
+      pickupMeshes.forEach(m => m.dispose());
+      obstacleMeshes = [];
+      pickupMeshes = [];
+
+      if (mascotMesh) mascotMesh.position.set(0, 0.8, 0);
+      if (camera) camera.position.set(0, 5, -8);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      init3DGameEngine();
+    });
+  </script>
+</body>
+</html>
