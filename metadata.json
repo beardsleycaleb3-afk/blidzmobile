@@ -1,6 +1,0 @@
-{
-  "name": "Mascot Runner 3D",
-  "description": "Touch-only 3D football mascot runner featuring a 9-slot lane grid, dual planes, gear loadout, and action scoring.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
